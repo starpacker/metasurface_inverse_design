@@ -3,11 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import wandb
-# from Pattern import PatternRects
 import torch.nn.functional as F
-# from FDTDModel import test_pattern_rects  # from para to spectrum
-from torch.optim import AdamW
-from torch.optim.lr_scheduler import OneCycleLR
 import torch.nn.utils as nn_utils
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
@@ -17,11 +13,12 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 from torchmetrics.image import StructuralSimilarityIndexMeasure
 import sys
+import matplotlib.pyplot as plt
 import time
 
 def get_now_time():
     """获取当前时间（以可读格式返回）"""
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    return time.strftime("%Y_%m_%d_%H_%M", time.localtime())
 
 # size of pattern : 400 * 400
 # size of spectrum after process : 6 * 201
@@ -34,24 +31,33 @@ class EPDataset(Dataset):
         self.spectrum = torch.tensor(spectrum, dtype=torch.float32)
         self.pattern = torch.tensor(pattern, dtype=torch.long)
 
-        # # 对 spectrum 按通道进行 min-max 归一化：沿最后一维计算最小值和最大值
-        # spec_min = self.spectrum.amin(dim=-1, keepdim=True)  # shape: [B, 6, 1]
-        # spec_max = self.spectrum.amax(dim=-1, keepdim=True)  # shape: [B, 6, 1]
-        
-        # # 避免除以零，加上一个很小的数 epsilon
-        # epsilon = 1e-8
-        # self.spectrum = (self.spectrum - spec_min) / (spec_max - spec_min + epsilon)
-
-    # def __getitem__(self, index):
-    #     return self.spectrum[index], self.pattern[index]
     def __getitem__(self, idx):
         spec = self.spectrum[idx]
+        # 不能添加噪声！！！ 数据很小，并且比较敏感
 
-        # # 随机添加噪声
-        # if np.random.rand() < 0.3:
-        #     spec += torch.randn_like(spec) * 0.01
         return spec, self.pattern[idx]
 
+    def __len__(self):
+        return self.spectrum.shape[0]
+    
+class EP_normalized_Dataset(Dataset):
+    def __init__(self, spectrum, pattern, value_list):
+        # 归一化处理
+        self.spectrum = torch.tensor(spectrum, dtype=torch.float32)
+        self.pattern = torch.tensor(pattern, dtype=torch.long)
+    
+        B, Channel, L = self.spectrum.shape  # B: batch, C: channels (6), L: length (201)
+        
+        # 逐通道归一化
+        for c in range(Channel):
+            min_val, max_val = value_list[c]
+            # min_val = current_channel.min(dim=1, keepdim=True)[0]  # 每个样本在该通道的最小值
+            # max_val = current_channel.max(dim=1, keepdim=True)[0]  # 每个样本在该通道的最大值
+            self.spectrum[:, c, :] = (self.spectrum[:, c, :] - min_val) / (max_val - min_val)
+    
+    def __getitem__(self, idx):
+        return self.spectrum[idx], self.pattern[idx]
+    
     def __len__(self):
         return self.spectrum.shape[0]
 
@@ -151,6 +157,9 @@ class HybridDecoder(nn.Module):
             # 16x16 -> 32x32
             ResidualUpBlock(128, 64),
 
+            # # new added
+            # SelfAttention(64),
+
             
             # 32x32 -> 64x64
             ResidualUpBlock(64, 32),
@@ -174,7 +183,9 @@ class HybridDecoder(nn.Module):
         batch_size = x.size(0)
         
         # 展平特征
-        x = x.view(batch_size, -1)  # (batch, 6*201)
+        # x = x.view(batch_size, -1)  # (batch, 6*201)
+
+        x = x.reshape(batch_size, -1)  # especially for auto_regressive.py
         
         # 全连接层
         x = self.fc(x)
@@ -324,37 +335,81 @@ class SSIMLoss(nn.Module):
         return 1 - self.ssim(pred, target.float())
 
 
-    
-pattern = torch.load('D:/subject/physics/AI4S/project1/tensor_data_2000/tensor_data_matrix2000.pt')
-spectrum = torch.load('D:/subject/physics/AI4S/project1/tensor_data_2000/tensor_spectrum2000.pt')
+# -------------------loading data-----------------------
+# pattern = torch.load('/data/group_003/yjh/data_set/tensor_data_matrix2000.pt')
+# spectrum = torch.load('/data/group_003/yjh/data_set/tensor_spectrum2000.pt')
+pattern = torch.load('combined_pattern.pt')
+spectrum = torch.load('combined_spectrum.pt')
 
-
-# # 定义抽样大小
-# sample_size = 800
-# # 随机抽样索引
-# indices = torch.randperm(pattern.size(0))[:sample_size]
-
-# # 使用索引直接从张量中提取子集
-# spectrum = spectrum[indices]
-# pattern = pattern[indices]
-
-# 使用抽样索引创建子集
 x_train, x_val, y_train, y_val = train_test_split(
     spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
     pattern,             # 确保 pattern_test 是张量
     test_size=0.1,
     random_state=42  # 确保结果可复现
 )
+print("pattern shape",pattern.shape)
+print("spectrum shape",spectrum.shape)
 
-# print(x_train[0])
-# sys.exit()
-# print(len(x_train))
-# print(len(y_train))
-# print(len(x_val))
-# print(len(y_val))
+# pattern = torch.load('/data/group_003/yjh/data_set/sythesis_patterns.pt')
+# spectrum = torch.load('/data/group_003/yjh/data_set/sythesis_spectra.pt') 
+# # 使用抽样索引创建子集
+# x_train, x_val, y_train, y_val = train_test_split(
+#     spectrum,  # 确保 spectrum_test 是张量
+#     pattern,             # 确保 pattern_test 是张量
+#     test_size=0.1,
+#     random_state=42  # 确保结果可复现
+# )
+# pattern = torch.load('combined_pattern.pt')
+# spectrum = torch.load('combined_spectrum.pt')
+# print("pattern shape",pattern.shape)
+# print("spectrum shape",spectrum.shape)
 
-# x_train, x_val, y_train, y_val = train_test_split( spectrum[:,1:7,:], pattern, test_size=0.1)
+# num_batches = 7
+# pattern = None
+# for i in range(num_batches):
+#     filename = f"/data/group_003/data_set_sxy/new_data_matrix_{i}.pt"
+#     batch = torch.load(filename)
+#     if pattern is None:
+#         pattern = batch
+#     else:
+#         pattern = torch.cat((pattern, batch), dim=0)
+#     print(pattern.shape)
+# print(f"Merged array shape: {pattern.shape}")
+# spectrum = torch.load('/data/group_003/data_set_sxy/new_spectrum.pt')
+# print(f"spectrum shape:{spectrum.shape}")
 
+# x_train, x_val, y_train, y_val = train_test_split(
+#     spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
+#     pattern,             # 确保 pattern_test 是张量
+#     test_size=0.1,
+#     random_state=42  # 确保结果可复现
+# )
+
+# ----------------------loading data------------------
+
+# # 使用抽样索引创建子集
+# x_train, x_val, y_train, y_val = train_test_split(
+#     spectrum,  # 确保 spectrum_test 是张量
+#     pattern,             # 确保 pattern_test 是张量
+#     test_size=0.1,
+#     random_state=42  # 确保结果可复现
+# )
+
+
+
+# value_list = [(-0.80770737, 0.824261), (-0.79511195, 0.85141766), (-0.8091829, 0.75830907), (-0.85016185, 0.8366283), (-0.7531471, 0.97804517), (-0.71447146, 0.8164543)]
+
+# train_set = EP_normalized_Dataset(
+#     spectrum=x_train,
+#     pattern=y_train,
+#     value_list=value_list
+#     )
+
+# test_set = EP_normalized_Dataset(
+#     spectrum=x_val,
+#     pattern=y_val,
+#     value_list=value_list
+#     )
 
 train_set = EPDataset(
     spectrum=x_train,
@@ -363,6 +418,8 @@ train_set = EPDataset(
 test_set = EPDataset(
     spectrum=x_val,
     pattern=y_val)
+
+
 
 train_data_loader = torch.utils.data.DataLoader(
     dataset=train_set,
@@ -384,15 +441,16 @@ test_data_loader = torch.utils.data.DataLoader(
 
 
 
-def train_model():
+def train_model(gpu_num):
     print("time for training ~~")
     now_time = get_now_time()
-    model_path = f"D:/subject/physics/AI4S/project1/model/best_designer_model_{now_time}.pth"
-    final_model_path = f'D:/subject/physics/AI4S/project1/model/final_designer_model_{now_time}.pth'
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_path = "best_designer_model.pth"
+    final_model_path = "final_designer_model.pth"
+
+    device = torch.device(f"cuda:{gpu_num}")
 
     # 训练参数
-    num_epochs = 20
+    num_epochs = 80
     learning_rate = 0.001
     best_val_loss = float('inf')
 
@@ -403,9 +461,13 @@ def train_model():
     scheduler = OneCycleLR(optimizer, max_lr=learning_rate, 
                           steps_per_epoch=len(train_data_loader), 
                           epochs=num_epochs)
+    # print(len(train_data_loader))
+    # print(train_data_loader.batch_size)
     criterion = nn.CrossEntropyLoss()  # 用于像素级分类
-    early_stopping = EarlyStopping(patience=6, delta=0.01)
+    early_stopping = EarlyStopping(patience=10, delta=0.01)
     ssimloss = SSIMLoss(device)  
+    # wandb.init(project="metasurface-design")
+    # wandb.watch(designer_model)
 
     # def boundary_pattern(predicted,patterns):
     #     # torch size of [B,400,400]
@@ -452,9 +514,9 @@ def train_model():
     def manul_loss(probs,patterns):
         #  design to optimize the loss function
 
-        predicted = (probs[:,1,:,:] > 0.5).squeeze().float()
-        side_loss = boundary_pattern(predicted,patterns)
-        direct_loss = pixel_loss(predicted,patterns)
+        predicted = probs[:,1,:,:].float()
+        side_loss = boundary_pattern(predicted,patterns.float())
+        direct_loss = pixel_loss(predicted,patterns.float())
 
         return direct_loss, side_loss
 
@@ -466,35 +528,81 @@ def train_model():
         # tv_weight = max(2 * (1 - epoch/num_epochs), 1)  # 随训练逐渐降低
 
         ssim_loss = ssimloss(logits,patterns)
-        ssim_weight = 0.02
+        ssim_weight = 0.2
 
         direct_loss, side_loss= manul_loss(probs,patterns)
-        direct_weight = 1.6
-        side_weight = 1.5
+        direct_weight = 5
+        side_weight = 1 
 
-
-
-
-        if not designer_model.training and epoch % 4 == 0:
-            print('ce_loss:',ce_loss)         
-            # print('tv_loss',tv_loss)           
-            print('ssim_loss',ssim_loss) 
-            print('direct_loss',direct_loss)
-            print('side_loss',side_loss)
 
 
         # loss = ce_loss + tv_weight * tv_loss + ssim_loss * ssim_weight + direct_loss * direct_weight + side_loss * side_weight
         # loss = ce_loss + tv_weight * tv_loss
 
-        loss = ce_loss + direct_loss * direct_weight + ssim_loss * ssim_weight + side_loss * side_weight
-
+        loss = (
+            ce_loss + 
+            direct_loss * direct_weight + 
+            ssim_loss * ssim_weight + 
+            side_loss * side_weight
+        )
         return loss
+    
+
+    def compute_loss_test(logits, probs, patterns, epoch):
+
+        direct_loss, side_loss= manul_loss(probs,patterns)
+        direct_weight = 5 - epoch * 0.2
+        side_weight = 1 + epoch * 0.06
+
+        return direct_loss * direct_weight + side_loss * side_weight
+    
+
+    
+    def compute_loss_val(logits, probs, patterns, epoch):
+
+        ce_loss = criterion(logits,patterns)
+
+        # tv_loss = total_variation_loss(probs)
+        # tv_weight = max(2 * (1 - epoch/num_epochs), 1)  # 随训练逐渐降低
+
+        ssim_loss = ssimloss(logits,patterns)
+        ssim_weight = 1
+
+        direct_loss, side_loss= manul_loss(probs,patterns)
+        direct_weight = 10
+        side_weight = 1
+
+        if epoch % 4 == 0:
+            print('epoch',epoch)
+            print('ce_loss:',ce_loss)         
+            # print('tv_loss',tv_loss)           
+            print('ssim_loss',ssim_loss * ssim_weight) 
+            print('direct_loss',direct_loss * direct_weight)
+            print('side_loss',side_loss * side_weight)
+
+
+        # loss = ce_loss + tv_weight * tv_loss + ssim_loss * ssim_weight + direct_loss * direct_weight + side_loss * side_weight
+        # loss = ce_loss + tv_weight * tv_loss
+
+        loss = (
+            ce_loss + 
+            direct_loss * direct_weight + 
+            ssim_loss * ssim_weight + 
+            side_loss * side_weight
+        )
+        return {
+            "total_loss": loss,
+            "ce_loss": ce_loss,
+            "ssim_loss": ssim_loss,
+            "pixel_loss": direct_loss,
+            "boundary_loss": side_loss,
+        }
 
     # 混合精度
     scaler = torch.cuda.amp.GradScaler() if torch.cuda.is_available() else None
 
-    # wandb.init(project="metasurface-design")
-    # wandb.watch(designer_model)
+    wandb.init(project="metasurface-design")
+    wandb.watch(designer_model)
 
     # 训练循环
     start_time = time.time()
@@ -512,7 +620,7 @@ def train_model():
             # 混合精度训练
             if scaler:
                 with torch.cuda.amp.autocast():
-                    logits = designer_model(spectra)  # shape (B, 2, 400,400)
+                    logits = designer_model(spectra)  # shape (B, 6, 201)
 
                     # 确保 outputs 是 float 类型
                     logits = logits.float()
@@ -521,6 +629,7 @@ def train_model():
 
                     probs = F.softmax(logits, dim=1)
 
+                    # loss = compute_loss(logits, probs, patterns, epoch)
                     loss = compute_loss(logits, probs, patterns, epoch)
 
                 scaler.scale(loss).backward()
@@ -536,7 +645,9 @@ def train_model():
                 patterns = patterns.long()
                 probs = F.softmax(logits, dim=1)
 
+                # loss = compute_loss(logits, probs, patterns, epoch)
                 loss = compute_loss(logits, probs, patterns, epoch)
+
                 loss.backward()
                 nn_utils.clip_grad_norm_(designer_model.parameters(), max_norm=1.0)
                 optimizer.step()
@@ -553,6 +664,11 @@ def train_model():
         designer_model.eval()
         designer_model.training = False
         val_loss = 0.0
+        val_ce_loss = 0.0
+        val_ssim_loss = 0.0
+        val_boundary_loss = 0.0
+        val_pixel_loss = 0.0
+
         with torch.no_grad():
             for spectra, patterns in test_data_loader:
                 spectra = spectra.float().to(device)
@@ -567,11 +683,27 @@ def train_model():
                 patterns = patterns.long()
                 probs = F.softmax(logits, dim=1)
 
-                loss = compute_loss(logits, probs, patterns, epoch)
+                loss_dict = compute_loss_val(logits, probs, patterns, epoch)
 
-                val_loss += loss.item() * spectra.size(0)
+                val_loss += loss_dict["total_loss"].item() * spectra.size(0)
+                val_ssim_loss += loss_dict["ssim_loss"].item() * spectra.size(0)
+                val_ce_loss += loss_dict["ce_loss"].item() * spectra.size(0)
+                val_pixel_loss += loss_dict["pixel_loss"].item() * spectra.size(0)
+                val_boundary_loss += loss_dict["boundary_loss"].item() * spectra.size(0)
         
         val_loss = val_loss / len(test_data_loader.dataset)
+        val_ce_loss = val_ce_loss / len(test_data_loader.dataset)
+        val_ssim_loss = val_ssim_loss / len(test_data_loader.dataset)
+        val_pixel_loss = val_pixel_loss / len(test_data_loader.dataset)
+        val_boundary_loss = val_boundary_loss / len(test_data_loader.dataset)
+
+        wandb.log({
+            "epoch": epoch,
+            "val_pixel_loss": val_pixel_loss,
+            "val_boundary_loss": val_boundary_loss,
+            "val_ssim_loss": val_ssim_loss,
+            "val_crossentropy_loss": val_ce_loss
+        })
         
         # 打印训练信息
         print(f"Epoch [{epoch+1}/{num_epochs}] | "
@@ -584,29 +716,73 @@ def train_model():
             print("Early stopping triggered!")
             break
         
-        # wandb.log({
-        # "train_loss": train_loss,
-        # "val_loss": val_loss
-        # })
-        # torch.cuda.empty_cache()
+        wandb.log({
+        "train_loss": train_loss,
+        ""
+        "val_loss": val_loss
+        })
+        torch.cuda.empty_cache()
         
         
         # 保存最佳模型
-        if val_loss < best_val_loss and val_loss < 0.4:
+        if val_loss < best_val_loss and val_loss < 2:
             print("------------------save best model!-----------------------")
             best_val_loss = val_loss
-            
+            time.sleep(0.5)
             torch.save(designer_model.state_dict(), model_path)
         
         end_time = time.time()
         elapsed_time = end_time - start_time  # 计算循环耗时
         print(f"{epoch + 1} epoch completed. Time taken: {elapsed_time:.4f} seconds")
-        time.sleep(0.5)
+        
     # 最终模型保存
+    print("save final model")
     torch.save(designer_model.state_dict(), final_model_path)
 
+def draw_pattern(pra,name:str):
+    try:
+        pra = pra.detach().numpy()
+    except:
+        pra = pra
+    fig, ax = plt.subplots()
+    ax.imshow(pra, origin='lower')
+    plt.xticks([]), plt.yticks([])
+    plt.show()
+    plt.savefig(name)
+
+
+def test_and_visualize(model, test_data_loader, device, num_samples=5):
+    """
+    测试模型并可视化预测结果
+    :param model: 训练好的模型
+    :param test_data_loader: 测试数据的 DataLoader
+    :param device: 设备（'cpu' 或 'cuda')
+    :param num_samples: 可视化的样本数量
+    """
+    model.eval()  # 设置模型为评估模式
+    with torch.no_grad():
+        for spectra, patterns in test_data_loader:
+            spectra = spectra.float().to(device)
+            patterns = patterns.squeeze(1).long().to(device)
+
+            # 模型预测
+            logits = model(spectra)
+            probs = F.softmax(logits, dim=1)
+            predicted = (probs[:, 1, :, :] > 0.5).float()
+
+            # 可视化真实图案和预测图案
+            for i in range(num_samples):
+                print(f"Sample {i + 1}:")
+                print("Real pattern:")
+                draw_pattern(patterns[i].cpu().numpy(),f"real{i+1}")  # 真实图案
+                print("Predicted pattern:")
+                draw_pattern(predicted[i].cpu().numpy(),f"imag{i+1}")  # 预测图案
+
+            # 只可视化指定数量的样本
+            break
+
 if __name__ == "__main__":
-    train_model()
+    train_model(gpu_num=0)
     
 
 
