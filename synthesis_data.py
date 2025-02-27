@@ -139,13 +139,21 @@ def get_para_random_pra_test(unit=400):
     return [pra1, pra2, pra3, pra4, pra5, pra6, pra7, pra8]
 
 class EncoderDecoderTrainer:
-    def __init__(self, device):
+    def __init__(self, device,name):
         self.device = device
+        self.model_name = name
 
         # Initialize forward and backward models
-        self.forward_model = Meta_CRNNAG_Net().to(self.device)
-        self.forward_model.CNNLayer[0].layer3[0].relu3 = nn.ELU()
-        checkpoint = torch.load('/data/group_003/yjh/logs/b512_adam_lr0.001_c1281WCRNNAG200epoch_v0.3/checkpoint_max.pth', map_location="cpu")
+        if self.model_name == "CRNNAG":
+            self.forward_model = Meta_CRNNAG_Net().to(self.device)
+            self.forward_model.CNNLayer[0].layer3[0].relu3 = nn.ELU()
+            checkpoint = torch.load('/data/group_003/yjh/logs/b512_adam_lr0.001_c1281WCRNN200epoch/checkpoint_max.pth', map_location="cpu")
+
+        if self.model_name == "CNN":
+            self.forward_model = Meta_CNN_Net().to(self.device)
+            self.forward_model.CNNLayer[0].layer3[0].relu3 = nn.ELU()
+            checkpoint = torch.load('/data/group_003/yjh/logs/b512_adam_lr0.001_c1281WCNN/checkpoint_max.pth', map_location="cpu")
+        
         self.forward_model.load_state_dict(checkpoint['net'])
         self.forward_model.eval()
 
@@ -160,21 +168,27 @@ class EncoderDecoderTrainer:
             if idx % 1000 ==0 and idx >0:
                 print(f"generate {idx} samples.......")
 
+        if self.model_name == "CRNNAG":
+            patterns = torch.stack(patterns).to(self.device)  # [B, 400, 400]
+            trg = torch.rand(num, 6, 201).to(self.device)  # [B, 6, 201]
+            with torch.no_grad():
+                spectrum = self.forward_model(patterns.float().unsqueeze(1),trg,0)
+        if self.model_name == "CNN":
+            patterns = torch.stack(patterns).to(self.device)  # [B, 400, 400]
+            with torch.no_grad():
+                spectrum = self.forward_model(patterns.float().unsqueeze(1))
 
-        patterns = torch.stack(patterns).to(self.device)  # [B, 400, 400]
-        trg = torch.rand(num, 6, 201).to(self.device)  # [B, 6, 201]
-        with torch.no_grad():
-            spectrum = self.forward_model(patterns.float().unsqueeze(1),trg,0)
         return patterns,spectrum
 
 if __name__=="__main__":
     gpu_num = 0
     device = f"cuda:{gpu_num}"
-    train = EncoderDecoderTrainer(device)
-    pattern,specturm = train.forward_step(num=3000)
+    name = "CNN"
+    train = EncoderDecoderTrainer(device,name)
+    pattern,specturm = train.forward_step(num=5)
     print(pattern.shape)
     print(specturm.shape)
-    torch.save(pattern,"sythesis_patterns_3000.pt")
-    torch.save(specturm,"sythesis_spectra_3000.pt")
+    torch.save(pattern,"/data/group_003/yjh/data_set_l/sythesis_patterns_CNN_3000.pt")
+    torch.save(specturm,"/data/group_003/yjh/data_set_l/sythesis_spectra_CNN_3000.pt")
 
     
