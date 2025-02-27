@@ -11,13 +11,16 @@ NOTE: 需要调整各个损失函数的权重  \\
 3. para_inference_resnet.py \\
    利用了resnet-like的网络架构，但似乎爆内存了，需要更大的GPU才能跑 \\
 
-4.auto_regressive.py \\
+4.para_inference_pro.py \\
+加大了模型的参数量，并且增加了注意力的位置，但是效果似乎并没有那么显著？可能需要加大数据量再进行测试 \\
+
+5.auto_regressive.py \\
   实现了forward model和inverse design的结合，正向网络利用CRNNAG来实现精确预测，反向网路则利用效果最好的hybriddecoder作为骨架实现
 
 
 
 ----------------------------------------------------------------------------------------------------------------------------
-                                            实验结果汇总
+实验结果汇总
 para_inference_pro.py
 加大了模型的参数和分辨率，在4000组数据的情况下能达到0.32832的最小ce loss
 
