@@ -15,6 +15,7 @@ from torchmetrics.image import StructuralSimilarityIndexMeasure
 import sys
 import matplotlib.pyplot as plt
 import time
+from ipdb import set_trace
 
 def get_now_time():
     """获取当前时间（以可读格式返回）"""
@@ -335,110 +336,6 @@ class SSIMLoss(nn.Module):
         return 1 - self.ssim(pred, target.float())
 
 
-# -------------------loading data-----------------------
-# pattern = torch.load('/data/group_003/yjh/data_set/tensor_data_matrix2000.pt')
-# spectrum = torch.load('/data/group_003/yjh/data_set/tensor_spectrum2000.pt')
-pattern = torch.load('combined_pattern.pt')
-spectrum = torch.load('combined_spectrum.pt')
-
-x_train, x_val, y_train, y_val = train_test_split(
-    spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
-    pattern,             # 确保 pattern_test 是张量
-    test_size=0.1,
-    random_state=42  # 确保结果可复现
-)
-print("pattern shape",pattern.shape)
-print("spectrum shape",spectrum.shape)
-
-# pattern = torch.load('/data/group_003/yjh/data_set/sythesis_patterns.pt')
-# spectrum = torch.load('/data/group_003/yjh/data_set/sythesis_spectra.pt') 
-# # 使用抽样索引创建子集
-# x_train, x_val, y_train, y_val = train_test_split(
-#     spectrum,  # 确保 spectrum_test 是张量
-#     pattern,             # 确保 pattern_test 是张量
-#     test_size=0.1,
-#     random_state=42  # 确保结果可复现
-# )
-# pattern = torch.load('combined_pattern.pt')
-# spectrum = torch.load('combined_spectrum.pt')
-# print("pattern shape",pattern.shape)
-# print("spectrum shape",spectrum.shape)
-
-# num_batches = 7
-# pattern = None
-# for i in range(num_batches):
-#     filename = f"/data/group_003/data_set_sxy/new_data_matrix_{i}.pt"
-#     batch = torch.load(filename)
-#     if pattern is None:
-#         pattern = batch
-#     else:
-#         pattern = torch.cat((pattern, batch), dim=0)
-#     print(pattern.shape)
-# print(f"Merged array shape: {pattern.shape}")
-# spectrum = torch.load('/data/group_003/data_set_sxy/new_spectrum.pt')
-# print(f"spectrum shape:{spectrum.shape}")
-
-# x_train, x_val, y_train, y_val = train_test_split(
-#     spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
-#     pattern,             # 确保 pattern_test 是张量
-#     test_size=0.1,
-#     random_state=42  # 确保结果可复现
-# )
-
-# ----------------------loading data------------------
-
-# # 使用抽样索引创建子集
-# x_train, x_val, y_train, y_val = train_test_split(
-#     spectrum,  # 确保 spectrum_test 是张量
-#     pattern,             # 确保 pattern_test 是张量
-#     test_size=0.1,
-#     random_state=42  # 确保结果可复现
-# )
-
-
-
-# value_list = [(-0.80770737, 0.824261), (-0.79511195, 0.85141766), (-0.8091829, 0.75830907), (-0.85016185, 0.8366283), (-0.7531471, 0.97804517), (-0.71447146, 0.8164543)]
-
-# train_set = EP_normalized_Dataset(
-#     spectrum=x_train,
-#     pattern=y_train,
-#     value_list=value_list
-#     )
-
-# test_set = EP_normalized_Dataset(
-#     spectrum=x_val,
-#     pattern=y_val,
-#     value_list=value_list
-#     )
-
-train_set = EPDataset(
-    spectrum=x_train,
-    pattern=y_train)
-
-test_set = EPDataset(
-    spectrum=x_val,
-    pattern=y_val)
-
-
-
-train_data_loader = torch.utils.data.DataLoader(
-    dataset=train_set,
-    batch_size=64,
-    shuffle=True,
-    drop_last=True,
-    num_workers=0,
-    pin_memory=True
-)
-
-test_data_loader = torch.utils.data.DataLoader(
-    dataset=test_set,
-    batch_size=64,
-    shuffle=True,
-    drop_last=False,
-    num_workers=0,
-    pin_memory=True
-)
-
 
 
 def train_model(gpu_num):
@@ -464,7 +361,7 @@ def train_model(gpu_num):
     # print(len(train_data_loader))
     # print(train_data_loader.batch_size)
     criterion = nn.CrossEntropyLoss()  # 用于像素级分类
-    early_stopping = EarlyStopping(patience=10, delta=0.01)
+    early_stopping = EarlyStopping(patience=8, delta=0.01)
     ssimloss = SSIMLoss(device)  
     # wandb.init(project="metasurface-design")
     # wandb.watch(designer_model)
@@ -712,7 +609,7 @@ def train_model(gpu_num):
         
         early_stopping(val_loss)
 
-        if early_stopping.early_stop:
+        if early_stopping.early_stop and epoch >= 30:
             print("Early stopping triggered!")
             break
         
@@ -782,7 +679,144 @@ def test_and_visualize(model, test_data_loader, device, num_samples=5):
             break
 
 if __name__ == "__main__":
-    train_model(gpu_num=0)
+
+    # -------------------loading data-----------------------
+    # gpu_num = 2
+    # pattern = torch.load('/data/group_003/yjh/data_set/tensor_data_matrix2000.pt')
+    # spectrum = torch.load('/data/group_003/yjh/data_set/tensor_spectrum2000.pt')
+    # # pattern = torch.load('combined_pattern.pt')
+    # # spectrum = torch.load('combined_spectrum.pt')
+
+    # x_train, x_val, y_train, y_val = train_test_split(
+    #     spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
+    #     pattern,             # 确保 pattern_test 是张量
+    #     test_size=0.1,
+    #     random_state=42  # 确保结果可复现
+    # )
+    # print("pattern shape",pattern.shape)
+    # print("spectrum shape",spectrum.shape)
+
+    gpu_num = 0
+    # pattern = torch.load("6000_real_pattern.pt")
+    # spectrum = torch.load("6000_real_spectrum.pt")
+    pattern = torch.load('/data/group_003/yjh/data_set_s/patterns_synthesis_6000.pt')
+    # spectrum = torch.load('/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_6000.pt') 
+    spectrum = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_6000.pt') 
+
+    pt = torch.load("/data/group_003/yjh/data_set_s/patterns_synthesis_5000.pt")
+    # sp = torch.load("/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_5000.pt")
+    sp = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_5000.pt') 
+    pattern = torch.cat((pattern,pt),dim=0)
+    spectrum = torch.cat((spectrum,sp),dim=0)
+
+    pt = torch.load("/data/group_003/yjh/data_set_s/patterns_synthesis_5000_2.pt")
+    # sp = torch.load("/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_5000_2.pt")
+    sp = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_5000_2.pt')
+    pattern = torch.cat((pattern,pt),dim=0)
+    spectrum = torch.cat((spectrum,sp),dim=0)
+
+    pt = torch.load("/data/group_003/yjh/data_set_s/patterns_synthesis_3000.pt")
+    # sp = torch.load("/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_3000.pt")
+    sp = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_3000.pt')
+    pattern = torch.cat((pattern,pt),dim=0)
+    spectrum = torch.cat((spectrum,sp),dim=0)
+
+    pt = torch.load("/data/group_003/yjh/data_set_s/patterns_synthesis_3000_2.pt")
+    # sp = torch.load("/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_3000_2.pt")
+    sp = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_3000_2.pt')
+    pattern = torch.cat((pattern,pt),dim=0)
+    spectrum = torch.cat((spectrum,sp),dim=0)
+
+    # pt = torch.load("/data/group_003/yjh/data_set_s/patterns_synthesis_6000_2.pt")
+    # # sp = torch.load("/data/group_003/yjh/data_set_s/spectra_CRNNAG_synthesis_6000_2.pt")
+    # sp = torch.load('/data/group_003/yjh/data_set_s/spectra_CNN_synthesis_6000_2.pt')
+    # pattern = torch.cat((pattern,pt),dim=0)
+    # spectrum = torch.cat((spectrum,sp),dim=0)
+
+
+    # spectrum = torch.load('/data/group_003/yjh/data_set_s/spectra_CRNNAG_attention_synthesis_3000.pt') 
+    # pattern = torch.load('/data/group_003/yjh/data_set_l/sythesis_patterns_3000.pt')
+    # spectrum = torch.load('/data/group_003/yjh/data_set_l/sythesis_spectra_3000.pt') 
+
+    print("pattern shape",pattern.shape)
+    print("spectrum shape",spectrum.shape)
+    x_train, x_val, y_train, y_val = train_test_split(
+        spectrum,  # 确保 spectrum_test 是张量
+        pattern,             # 确保 pattern_test 是张量
+        test_size=0.1,
+        random_state=42  # 确保结果可复现
+    )
+
+    # gpu_num = 0
+    # num_batches = 20
+    # pattern = None
+    # for i in range(num_batches):
+    #     filename = f"/data/group_003/data_set_b/new_data_matrix_{i}.pt"
+    #     batch = torch.load(filename)
+    #     if pattern is None:
+    #         pattern = batch
+    #     else:
+    #         pattern = torch.cat((pattern, batch), dim=0)
+    #     print(i+1,pattern.shape)
+    # print(f"Merged array shape: {pattern.shape}")
+    # spectrum = torch.load(f'/data/group_003/data_set_b/new_data_spectrum_{num_batches}000.pt')
+    # print(f"spectrum shape:{spectrum.shape}")
+
+    # x_train, x_val, y_train, y_val = train_test_split(
+    #     spectrum[:, 1:7, :],  # 确保 spectrum_test 是张量
+    #     pattern,             # 确保 pattern_test 是张量
+    #     test_size=0.1,
+    #     random_state=42  # 确保结果可复现
+    # )
+
+    # ----------------------loading data------------------
+
+    # # 使用抽样索引创建子集
+    # x_train, x_val, y_train, y_val = train_test_split(
+    #     spectrum,  # 确保 spectrum_test 是张量
+    #     pattern,             # 确保 pattern_test 是张量
+    #     test_size=0.1,
+    #     random_state=42  # 确保结果可复现
+    # )
+
+
+
+    # value_list = [(-0.80770737, 0.824261), (-0.79511195, 0.85141766), (-0.8091829, 0.75830907), (-0.85016185, 0.8366283), (-0.7531471, 0.97804517), (-0.71447146, 0.8164543)]
+
+    # train_set = EP_normalized_Dataset(
+    #     spectrum=x_train,
+    #     pattern=y_train,
+    #     value_list=value_list
+    #     )
+
+    # test_set = EP_normalized_Dataset(
+    #     spectrum=x_val,
+    #     pattern=y_val,
+    #     value_list=value_list
+    #     )
+
+    train_set = EPDataset(
+        spectrum=x_train,
+        pattern=y_train)
+
+    test_set = EPDataset(
+        spectrum=x_val,
+        pattern=y_val)
+
+
+
+    train_data_loader = torch.utils.data.DataLoader(
+        dataset=train_set,
+        batch_size=64,
+        shuffle=True,
+        drop_last=True
+    )
+
+    test_data_loader = torch.utils.data.DataLoader(
+        dataset=test_set,
+        batch_size=64,
+        shuffle=True,
+        drop_last=False
+    )
+    train_model(gpu_num=gpu_num)
     
-
-
