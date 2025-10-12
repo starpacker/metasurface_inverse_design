@@ -124,6 +124,8 @@ graph LR
     style A fill:#e1f5fe
     style H fill:#c8e6c9
     style E fill:#fff3e0
+
+```mermaid
 graph LR
     I[cent_obs<br/>(cent_obs_shape)] --> J{Base:<br/>CNN/MLP}
     J --> K[features<br/>(hidden_size)]
