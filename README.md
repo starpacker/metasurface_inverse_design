@@ -109,33 +109,35 @@ CNN: 0.0796
 老师给出了一个改进方案：那就是利用10个数据作为output，而不是1206个数据？！
 这样真的可以吗
 可能需要归一化，之后继续
-
 ```mermaid
-graph LR
-    A[obs<br/>(obs_shape)] --> B{Base:<br/>CNN/MLP}
-    B --> C[features<br/>(hidden_size)]
-    C --> D{RNN?}
-    D -->|Yes| E[RNNLayer<br/>(hidden→hidden, N layers)]
-    E --> F[updated features<br/>+ rnn_states]
+graph TD
+    A[Observation obs<br/>Shape: obs_shape] --> B{Base Layer<br/>CNNBase if 3D<br/>MLPBase otherwise}
+    B --> C[actor_features<br/>Dimension: hidden_size]
+    C --> D{Use RNN?<br/>use_naive_recurrent_policy<br/>or use_recurrent_policy}
+    D -->|Yes| E[RNN Layer<br/>Input: hidden_size → Output: hidden_size<br/>Layers: recurrent_N<br/>Handles: rnn_states, masks]
+    E --> F[Update actor_features<br/>+ rnn_states]
     D -->|No| F
-    F --> G[ACTLayer<br/>(dist, avail, det)]
-    G --> H[actions + log_probs<br/>+ rnn_states]
+    F --> G[ACT Layer<br/>Input: actor_features<br/>Generates action distribution<br/>Supports: available_actions, deterministic]
+    G --> H[Actions actions<br/>+ action_log_probs<br/>+ rnn_states]
 
     style A fill:#e1f5fe
     style H fill:#c8e6c9
     style E fill:#fff3e0
-
 ```mermaid
-graph LR
-    I[cent_obs<br/>(cent_obs_shape)] --> J{Base:<br/>CNN/MLP}
-    J --> K[features<br/>(hidden_size)]
-    K --> L{RNN?}
-    L -->|Yes| M[RNNLayer<br/>(hidden→hidden, N layers)]
-    M --> N[updated features<br/>+ rnn_states]
+graph TD
+    I[Centralized Observation cent_obs<br/>Shape: cent_obs_shape] --> J{Base Layer<br/>CNNBase if 3D<br/>MLPBase otherwise}
+    J --> K[critic_features<br/>Dimension: hidden_size]
+    K --> L{Use RNN?<br/>use_naive_recurrent_policy<br/>or use_recurrent_policy}
+    L -->|Yes| M[RNN Layer<br/>Input: hidden_size → Output: hidden_size<br/>Layers: recurrent_N<br/>Handles: rnn_states, masks]
+    M --> N[Update critic_features<br/>+ rnn_states]
     L -->|No| N
-    N --> O{Output:<br/>PopArt/Linear<br/>(hidden→1)}
-    O --> R[values + rnn_states]
+    N --> O{Use PopArt?<br/>use_popart}
+    O -->|Yes| P[PopArt Layer<br/>hidden_size → 1<br/>Adaptive scaling]
+    O -->|No| Q[Linear Layer<br/>hidden_size → 1<br/>Orthogonal initialization]
+    P --> R[Value predictions values<br/>+ rnn_states]
+    Q --> R
 
     style I fill:#e1f5fe
     style R fill:#c8e6c9
     style M fill:#fff3e0
+    
