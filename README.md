@@ -111,17 +111,29 @@ CNN: 0.0796
 可能需要归一化，之后继续
 
 ```mermaid
-graph TD
-    A[观测 obs<br/>形状: obs_shape] --> B{Base 层<br/>CNNBase if 3D<br/>MLPBase otherwise}
-    B --> C[actor_features<br/>维度: hidden_size]
-    C --> D{使用 RNN?<br/>use_naive_recurrent_policy<br/>or use_recurrent_policy}
-    D -->|是| E[RNNLayer<br/>输入: hidden_size → 输出: hidden_size<br/>层数: recurrent_N<br/>处理: rnn_states, masks]
-    E --> F[更新 actor_features<br/>+ rnn_states]
-    D -->|否| F
-    F --> G[ACTLayer<br/>输入: actor_features<br/>生成动作分布<br/>支持: available_actions, deterministic]
-    G --> H[动作 actions<br/>+ action_log_probs<br/>+ rnn_states]
+graph LR
+    A[obs<br/>(obs_shape)] --> B{Base:<br/>CNN/MLP}
+    B --> C[features<br/>(hidden_size)]
+    C --> D{RNN?}
+    D -->|Yes| E[RNNLayer<br/>(hidden→hidden, N layers)]
+    E --> F[updated features<br/>+ rnn_states]
+    D -->|No| F
+    F --> G[ACTLayer<br/>(dist, avail, det)]
+    G --> H[actions + log_probs<br/>+ rnn_states]
 
     style A fill:#e1f5fe
     style H fill:#c8e6c9
     style E fill:#fff3e0
-    
+graph LR
+    I[cent_obs<br/>(cent_obs_shape)] --> J{Base:<br/>CNN/MLP}
+    J --> K[features<br/>(hidden_size)]
+    K --> L{RNN?}
+    L -->|Yes| M[RNNLayer<br/>(hidden→hidden, N layers)]
+    M --> N[updated features<br/>+ rnn_states]
+    L -->|No| N
+    N --> O{Output:<br/>PopArt/Linear<br/>(hidden→1)}
+    O --> R[values + rnn_states]
+
+    style I fill:#e1f5fe
+    style R fill:#c8e6c9
+    style M fill:#fff3e0
