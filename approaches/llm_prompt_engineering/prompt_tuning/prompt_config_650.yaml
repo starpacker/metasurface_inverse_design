@@ -1,0 +1,47 @@
+system_prompt: "Analyze a metal-insulator-metal (MIM) metasurface structure and predict its optical response using a dataset\
+  \ of similar structures. The target structure consists of:\n  1. A 40 nm thick continuous gold (Au) substrate.\n  2. A 100\
+  \ nm thick SiO2 spacer layer.\n  3. A top layer with 40 nm tall Au nanostructures shaped as two rectangular blocks.\n  4.\
+  \ Unit cell period: 400 nm * 400 nm.\n\n  **Dataset Description**:\n  - The dataset contains optical response data for a\
+  \ variety of MIM metasurfaces with two rectangular Au nanostructures, including:\n    - Varying dimensions (length, width)\
+  \ of the rectangular blocks.\n    - Different positions of the rectangular blocks within the unit cell.\n    - Measurements\
+  \ of circular polarization reflection coefficients at a wavelength of 650 nm.\n  - The dataset is structured as follows:\n\
+  \    - **Input Structure Representation**: [a, b, c, d, e, f, g, h]\n      - a: x-coordinate of the top-left corner of the\
+  \ first rectangular block.\n      - b: y-coordinate of the top-left corner of the first rectangular block.\n      - c: Length\
+  \ of the first rectangular block.\n      - d: Width of the first rectangular block.\n      - e: x-coordinate of the top-left\
+  \ corner of the second rectangular block.\n      - f: y-coordinate of the top-left corner of the second rectangular block.\n\
+  \      - g: Length of the second rectangular block.\n      - h: Width of the second rectangular block.\n  - **Output Spectrum\
+  \ Specifications**:\n    - The optical response is defined by circular polarization reflection coefficients, split into\
+  \ real and imaginary components. The coefficients correspond to the following polarization conversions:\n      - r_rl: Right-handed\
+  \ circular polarization (RCP) → Left-handed circular polarization (LCP).\n      - r_lr: Left-handed circular polarization\
+  \ (LCP) → Right-handed circular polarization (RCP).\n      - r_rr: Right-handed circular polarization (RCP) → Right-handed\
+  \ circular polarization (RCP).\n    - The output format for the spectrum response at 650 nm follows the following structure:\n\
+  \      {\n          \"spectrum_response\": {\n          \"r_rl_real\": <value>, \"r_rl_imag\": <value>,\n          \"r_lr_real\"\
+  : <value>, \"r_lr_imag\": <value>,\n          \"r_rr_real\": <value>, \"r_rr_imag\": <value>\n          }\n      }\n\n \
+  \ **Task Requirements**:\n  1. Carefully examine the dataset to identify patterns and relationships between the structural\
+  \ parameters [a, b, c, d, e, f, g, h] and the optical responses at 650 nm.\n  2. Analyze the following key aspects to guide\
+  \ your prediction:\n    - **Symmetry Effects**: Investigate how the positions (a, b, e, f) and dimensions (c, d, g, h) of\
+  \ the two blocks influence the symmetry of the structure. Note that symmetry tends to make r_rl and r_lr similar, while\
+  \ asymmetry (due to block positions) introduces small differences.\n    - **Coupling Effects**: Consider how the separation\
+  \ between the two blocks (e.g., distance between (a, b) and (e, f)) affects near-field coupling, which may alter the magnitude\
+  \ and phase of the reflection coefficients.\n    - **Size Effects**: Explore how the dimensions of the blocks (c, d, g,\
+  \ h) influence the resonant behavior and optical response at 650 nm.\n    - **Sensitivity to Small Changes**: Be aware that\
+  \ small variations in structural parameters might lead to significant changes in the response, particularly near exceptional\
+  \ points (EPs).\n  3. Look for correlations between the structural parameters and the sign, magnitude, and phase of the\
+  \ reflection coefficients (r_rl, r_lr, r_rr).\n  4. Predict the polarization-resolved reflection spectra for the target\
+  \ structure at a wavelength of 650 nm, providing the real and imaginary parts for r_rl, r_lr, and r_rr in the specified\
+  \ output format.\n  5. Ensure the prediction accounts for both near-field coupling between the blocks and far-field interference\
+  \ effects within the periodic unit cell.\n\n  **Notes**:\n  - The dataset ensures that the two rectangular blocks do not\
+  \ overlap.\n  - Due to the breaking of symmetry by the positions of the blocks, expect slight differences between r_rl and\
+  \ r_lr despite their tendency to be similar.\n  - Pay close attention to the sign (positive or negative) and scale (magnitude)\
+  \ of both the real and imaginary parts of the coefficients, as these are sensitive to structural variations.\n  "
+response_format: "\n        please answer in the following format:\n        <ans>\n        {\n        \"spectrum_response\"\
+  : {\n            \"r_rl\": {\"real\": <float>, \"imag\": <float>},\n            \"r_lr\": {\"real\": <float>, \"imag\":\
+  \ <float>},\n            \"r_rr\": {\"real\": <float>, \"imag\": <float>}\n        }\n        }\n        </ans>\n      \
+  \  "
+template_variables:
+  wavelength: 650
+  material: Au/SiO2
+  polarization_types:
+  - RCP→LCP (r_rl)
+  - LCP→RCP (r_lr)
+  - RCP→RCP (r_rr)
