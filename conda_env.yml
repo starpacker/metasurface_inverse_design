@@ -1,0 +1,27 @@
+name: pytorch_sac_ae
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pip
+  - numpy=1.23
+  - scipy=1.9
+  - matplotlib=3.5
+  - pillow=9.5
+  - absl-py=1.4
+  - pyparsing=3.0.9
+  - gym=0.21
+  - pytorch=1.10.2
+  - torchvision=0.11.3
+  - cudatoolkit=11.3   # 无GPU就删掉它
+  - imageio=2.26
+  - imageio-ffmpeg=0.4.8
+  - pip:
+      - mujoco==2.3.3
+      - glfw==2.5.9
+      - dm-control==1.0.14
+      - git+https://github.com/denisyarats/dmc2gym.git
+      - tb-nightly
+      - termcolor==2.3.0
