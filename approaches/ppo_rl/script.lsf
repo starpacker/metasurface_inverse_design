@@ -1,0 +1,133 @@
+# 记录偏振入射，monitor接收到的光
+# 强度和相位信息
+# 设置结构高度
+format long;
+
+data_plot=1;
+nums = 201;
+# 读取背景光场
+# 检验背景光
+##加入结构，设置x方向偏振光源
+switchtolayout;
+
+
+# 设置频率点选取为101
+setglobalmonitor("frequency points",201);
+
+select('AUs');
+set('enabled', 0);
+
+pras = readdata('pra.txt');
+for (i =1: length(pras)){
+    # set pre-parameters
+    set("pra"+num2str(i),pras(i)*1e-9);}
+    
+
+#设置光源
+select("source");
+set("polarization angle",90);
+set("phase",0);
+
+run;
+
+m = "R";
+f = getdata(m,"f");
+lambda = c/f *1e9;
+
+x = getdata(m,"x");
+y = getdata(m,"y");
+Ey = getdata(m,"Ey");
+
+E_back = integrate(Ey, 1:2, x,y);
+
+
+
+data_save = 1;
+##加入结构，设置x方向偏振光源
+switchtolayout;
+
+# 设置频率点选取101
+setglobalmonitor("frequency points",nums);
+## 删掉之前的结构
+select("AUs");
+set('enabled', 1);
+
+#设置光源
+select("source");
+set("polarization angle",0);
+set("phase",0);
+
+run;
+
+m = "R";
+f = getdata(m,"f");
+lambda = c/f *1e9;
+
+x = getdata(m,"x");
+y = getdata(m,"y");
+initial_Exx = getdata(m,"Ex");
+initial_Exy = getdata(m,"Ey");
+
+sum_Exx = integrate(initial_Exx, 1:2, x,y);
+sum_Exy = integrate(initial_Exy, 1:2, x,y);
+
+
+Exx = sum_Exx/E_back;
+Exy = sum_Exy/E_back;
+
+# y入射
+#设置光源
+switchtolayout;
+select("source");
+set("polarization angle",90);
+set("phase",0);
+
+run;
+
+m = "R";
+f = getdata(m,"f");
+lambda = c/f *1e9;
+
+x = getdata(m,"x");
+y = getdata(m,"y");
+initial_Eyx = getdata(m,"Ex");
+initial_Eyy = getdata(m,"Ey");
+
+sum_Eyx = integrate(initial_Eyx, 1:2, x,y);
+sum_Eyy = integrate(initial_Eyy, 1:2, x,y);
+
+
+Eyx = sum_Eyx/E_back;
+Eyy = sum_Eyy/E_back;
+
+# 计算左转右与右转左的实部与虚部
+r_lr = (real(Exx) - real(Eyy) + 2*imag(Exy))/2 + (1i/2) * (imag(Exx) - imag(Eyy) - 2*real(Exy));
+r_rl = (real(Exx) - real(Eyy) - 2*imag(Exy))/2 + (1i/2) * (imag(Exx) - imag(Eyy) + 2*real(Exy));
+r_rr = (Exx + Eyy + 1i*(Exy -Eyx))/2;
+r_ll = (Exx + Eyy - 1i*(Exy -Eyx))/2;
+
+delta = (Exx - Eyy)^2 + 4*(Exy)^2;
+# 计算两个本征态的实部与虚部
+eig_state_1 = (1/2)*(Exx+Eyy+(delta)^(1/2));
+eig_state_2 = (1/2)*(Exx+Eyy-(delta)^(1/2));
+
+
+if(data_save==1){
+    ln = length(f);
+    data = matrix(ln,22);
+    data(1:ln,1) = f/1e12;
+    data(1:ln,2) = lambda;
+    data(1:ln,3) = real(Exx);data(1:ln,4) = imag(Exx);
+    data(1:ln,5) = real(Exy);data(1:ln,6) = imag(Exy);
+    data(1:ln,7) = real(Eyx);data(1:ln,8) = imag(Eyx);
+    data(1:ln,9) = real(Eyy);data(1:ln,10) = imag(Eyy);
+    data(1:ln,11) = real(r_lr);data(1:ln,12) = imag(r_lr);
+    data(1:ln,13) = real(r_rl);data(1:ln,14) = imag(r_rl);
+    data(1:ln,15) = real(r_rr);data(1:ln,16) = imag(r_rr);
+    data(1:ln,17) = real(r_ll);data(1:ln,18) = imag(r_ll);
+    data(1:ln,19) = real(eig_state_1);data(1:ln,20) = imag(eig_state_1);
+    data(1:ln,21) = real(eig_state_2);data(1:ln,22) = imag(eig_state_2);
+    write('farfile_reflection.txt',num2str(data));
+    }
+    
+    
